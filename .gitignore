@@ -1,0 +1,23 @@
+### IDE files###
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+*.iws
+*.ipr
+nbproject/
+.vscode/
+
+### Maven output ###
+target/
+**/target/
+
+### Runtime data ###
+data/persistent/
+data/runtime/
+!data/Connections_Data.json
+
+
+### Mac OS ###
+.DS_Store
