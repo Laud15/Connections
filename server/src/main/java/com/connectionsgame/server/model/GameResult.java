@@ -62,12 +62,12 @@ public class GameResult {
 
     public int getTotalPlayers() { return playerSummaries.size(); }
 
-    public long getCompletedCount() {
-        return playerSummaries.values().stream().filter(ps -> ps.isCompleted()).count();
+    public int getCompletedCount() {
+        return (int) playerSummaries.values().stream().filter(ps -> ps.isCompleted()).count();
     }
 
-    public long getWinCount() {
-        return playerSummaries.values().stream().filter(ps -> ps.isWon()).count();
+    public int getWinCount() {
+        return (int) playerSummaries.values().stream().filter(ps -> ps.isWon()).count();
     }
 
     public double getAverageScore() {

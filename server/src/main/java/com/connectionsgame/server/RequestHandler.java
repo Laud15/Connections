@@ -14,14 +14,12 @@ import java.util.logging.Logger;
 
 /**
  * Processes one client request and produces a JSON response string.
- *
  * Lifecycle:
  *   1. NioServer receives a complete '\n'-terminated JSON message.
  *   2. NioServer submits a new RequestHandler(rawJson, session, ...) to the thread pool.
  *   3. run() parses and dispatches the request, builds a typed Response object,
  *      serializes it to JSON, and hands the result back via WriteCallback.
  *   4. The Selector thread (NioServer) writes the JSON string to the SocketChannel.
- *
  * This class holds no shared mutable state — all inputs are via constructor.
  * Thread safety is therefore guaranteed without any synchronization in this class.
  */
@@ -72,57 +70,52 @@ public class RequestHandler implements Runnable {
 
     private String dispatch(Request req) throws IOException {
         return switch (req.getOperation()) {
-            case "register"           -> handleRegister((RegisterRequest) req);
-            case "updateCredentials"  -> handleUpdateCredentials((UpdateCredentialsRequest) req);
-            case "login"              -> handleLogin((LoginRequest) req);
-            case "logout"             -> handleLogout();
-            case "submitProposal"     -> handleSubmitProposal((SubmitProposalRequest) req);
-            case "requestGameInfo"    -> handleRequestGameInfo((GameInfoRequest) req);
-            case "requestGameStats"   -> handleRequestGameStats((GameStatsRequest) req);
+            case "register" -> handleRegister((RegisterRequest) req);
+            case "updateCredentials" -> handleUpdateCredentials((UpdateCredentialsRequest) req);
+            case "login" -> handleLogin((LoginRequest) req);
+            case "logout" -> handleLogout();
+            case "submitProposal" -> handleSubmitProposal((SubmitProposalRequest) req);
+            case "requestGameInfo" -> handleRequestGameInfo((GameInfoRequest) req);
+            case "requestGameStats" -> handleRequestGameStats((GameStatsRequest) req);
             case "requestLeaderboard" -> handleRequestLeaderboard((LeaderBoardRequest) req);
             case "requestPlayerStats" -> handleRequestPlayerStats();
-            default                   -> error(400, "Unknown operation: " + req.getOperation());
+            default -> error(400, "Unknown operation: " + req.getOperation());
         };
     }
 
     // ── Handlers ──────────────────────────────────────────────────────────
 
     private String handleRegister(RegisterRequest req) throws IOException {
-        if (blank(req.getName()))
-            return error(400, "Username cannot be empty");
-        if (blank(req.getPsw()))
-            return error(400, "Password cannot be empty");
+        if (blank(req.getName())) { return error(400, "Username cannot be empty"); }
+        if (blank(req.getPsw())) {return error(400, "Password cannot be empty");}
 
         boolean ok = userStorage.register(req.getName(), req.getPsw());
-        if (!ok)
-            return error(409, "Username '" + req.getName() + "' is already taken");
+        if (!ok) {return error(409, "Username '" + req.getName() + "' is already taken");}
 
-        return json(new RegisterResponse());
+        return json(new RegisterResponse("register completed"));
     }
 
     private String handleUpdateCredentials(UpdateCredentialsRequest req) throws IOException {
-        if (blank(req.getOldName()) || blank(req.getOldPsw()))
-            return error(400, "oldName and oldPsw are required");
-        if (req.getNewName() == null && req.getNewPsw() == null)
-            return error(400, "At least one of newName or newPsw must be provided");
+        if (blank(req.getOldName()) || blank(req.getOldPsw())) { return error(400, "oldName and oldPsw are required");}
+        if (req.getNewName() == null && req.getNewPsw() == null) { return error(400, "At least one of newName or newPsw must be provided");}
 
         String errMsg = userStorage.updateCredentials(
-                req.getOldName(), req.getOldPsw(), req.getNewName(), req.getNewPsw());
-        if (errMsg != null)
-            return error(401, errMsg);
+                req.getOldName(),
+                req.getOldPsw(),
+                req.getNewName(),
+                req.getNewPsw()
+        );
+        if (errMsg != null) {return error(401, errMsg);}
 
         return json(new UpdateCredentialsResponse("Credentials updated successfully"));
     }
 
     private String handleLogin(LoginRequest req) {
-        if (session.isLoggedIn())
-            return error(403, "Already logged in as " + session.getLoggedInUserName());
-        if (blank(req.getUsername()) || blank(req.getPwd()))
-            return error(400, "username and psw are required");
+        if (session.isLoggedIn()) {return error(403, "Already logged in as " + session.getLoggedInUserName());}
+        if (blank(req.getUsername()) || blank(req.getPwd())) {return error(400, "username and psw are required");}
 
         User user = userStorage.authenticate(req.getUsername(), req.getPwd());
-        if (user == null)
-            return error(401, "Wrong username or password");
+        if (user == null) {return error(401, "Wrong username or password");}
 
         session.login(req.getUsername(), req.getUdpPort());
 
@@ -148,25 +141,23 @@ public class RequestHandler implements Runnable {
     }
 
     private String handleLogout() {
-        if (!session.isLoggedIn())
-            return error(401, "Not logged in");
+        if (!session.isLoggedIn()) {return error(401, "Not logged in");}
 
         session.logout();
         return json(new LogoutResponse("Logged out successfully"));
     }
 
     private String handleSubmitProposal(SubmitProposalRequest req) {
-        if (!session.isLoggedIn())
-            return error(401, "Not logged in");
+        if (!session.isLoggedIn()) {return error(401, "Not logged in");}
 
-        GameManager.ProposalResult result =
-                gameManager.submitProposal(session.getLoggedInUserName(), req.getWords());
+        GameManager.ProposalResult result = gameManager.submitProposal(session.getLoggedInUserName(), req.getWords());
 
         return switch (result.getKind()) {
             case CORRECT -> {
                 PuzzleGroup g = result.getMatchedGroup();
                 yield json(new SubmitProposalResponse(
-                        g.getTheme(), g.getWords(),
+                        g.getTheme(),
+                        g.getWords(),
                         result.getCurrentScore(),
                         result.isGameOver(),
                         result.isGameOver() ? true : null));
@@ -177,15 +168,14 @@ public class RequestHandler implements Runnable {
                     result.isGameOver(),
                     result.isGameOver() ? false : null));
             case MALFORMED -> error(400, result.getMessage());
-            case ERROR     -> error(403, result.getMessage());
+            case ERROR -> error(403, result.getMessage());
         };
     }
 
     private String handleRequestGameInfo(GameInfoRequest req) {
-        if (!session.isLoggedIn())
-            return error(401, "Not logged in");
+        if (!session.isLoggedIn()) {return error(401, "Not logged in");}
 
-        int         gameId  = req.getId();
+        int gameId  = req.getId();
         GameSession current = gameManager.getCurrentGame();
 
         // -1 or matching current gameId → return live state
@@ -210,28 +200,27 @@ public class RequestHandler implements Runnable {
 
         // Historical game
         GameResult result = gameManager.getHistoricalGame(gameId);
-        if (result == null)
-            return error(404, "Game #" + gameId + " not found");
+        if (result == null) {return error(404, "Game #" + gameId + " not found");}
 
-        GameResult.PlayerSummary summary =
-                result.getPlayerSummaries().get(session.getLoggedInUserName());
+        GameResult.PlayerSummary summary = result.getPlayerSummaries().get(session.getLoggedInUserName());
 
         int correct = summary != null ? summary.getCorrectGroups() : 0;
-        int mistakes = summary != null ? summary.getMistakes()     : 0;
-        int score    = summary != null ? summary.getScore()        : 0;
+        int mistakes = summary != null ? summary.getMistakes() : 0;
+        int score = summary != null ? summary.getScore() : 0;
 
         return json(new GameInfoResponse(
                 result.getGameId(),
                 result.getSolution(),
-                correct, mistakes, score
+                correct,
+                mistakes,
+                score
         ));
     }
 
     private String handleRequestGameStats(GameStatsRequest req) {
-        if (!session.isLoggedIn())
-            return error(401, "Not logged in");
+        if (!session.isLoggedIn()) {return error(401, "Not logged in");}
 
-        int         gameId  = req.getId();
+        int gameId = req.getId();
         GameSession current = gameManager.getCurrentGame();
 
         if (gameId == -1 || (current != null && gameId == current.getGameId())) {
@@ -242,28 +231,26 @@ public class RequestHandler implements Runnable {
             return json(new GameStatsResponse(
                     current.getGameId(),
                     current.getRemainingSeconds(),
-                    (int) current.getPlayersStillPlaying(),
-                    (int) current.getPlayersFinished(),
-                    (int) current.getPlayersWon()
+                    current.getPlayersStillPlaying(), //cast as int because getPlayersStillPlaying return a long
+                    current.getPlayersFinished(),
+                    current.getPlayersWon()
             ));
         }
 
         GameResult result = gameManager.getHistoricalGame(gameId);
-        if (result == null)
-            return error(404, "Game #" + gameId + " not found");
+        if (result == null) {return error(404, "Game #" + gameId + " not found");}
 
         return json(new GameStatsResponse(
                 result.getGameId(),
                 result.getTotalPlayers(),
-                (int) result.getCompletedCount(),
-                (int) result.getWinCount(),
+                result.getCompletedCount(),
+                result.getWinCount(),
                 result.getAverageScore()
         ));
     }
 
     private String handleRequestLeaderboard(LeaderBoardRequest req) {
-        if (!session.isLoggedIn())
-            return error(401, "Not logged in");
+        if (!session.isLoggedIn()) {return error(401, "Not logged in");}
 
         List<User> board = userStorage.getLeaderboard();
 
@@ -296,12 +283,10 @@ public class RequestHandler implements Runnable {
     }
 
     private String handleRequestPlayerStats() {
-        if (!session.isLoggedIn())
-            return error(401, "Not logged in");
+        if (!session.isLoggedIn()) {return error(401, "Not logged in");}
 
         User user = userStorage.getByUsername(session.getLoggedInUserName());
-        if (user == null)
-            return error(404, "User not found");
+        if (user == null) {return error(404, "User not found");}
 
         return json(new PlayerStatsResponse(
                 user.getPuzzlesCompleted(),
@@ -340,7 +325,7 @@ public class RequestHandler implements Runnable {
     }
 
     private List<String> themeNames(List<PuzzleGroup> groups) {
-        return groups.stream().map(PuzzleGroup::getTheme).toList();
+        return groups.stream().map(g->g.getTheme()).toList();
     }
 
     private List<String> shuffled(List<String> words) {

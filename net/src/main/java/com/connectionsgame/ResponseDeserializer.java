@@ -20,6 +20,11 @@ public class ResponseDeserializer {
             throw new IllegalArgumentException("Malformed JSON: " + e.getMessage());
         }
 
+        if (obj.has("status") && "error".equals(obj.get("status").getAsString())) {
+            return GSON.fromJson(json, ErrorResponse.class);
+        }
+
+
         if(!obj.has("operation")){
             throw new IllegalArgumentException("Missing 'operation' field in request");
         }

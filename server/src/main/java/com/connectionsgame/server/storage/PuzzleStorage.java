@@ -2,71 +2,91 @@ package com.connectionsgame.server.storage;
 
 import com.connectionsgame.server.model.Puzzle;
 import com.connectionsgame.server.model.PuzzleGroup;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.logging.Logger;
 
-//Provides in-memory access to all puzzles stored in a single JSON file.
-//At startup, the entire file is parsed once and all puzzles are loaded into a HashMap (gameId -> Puzzle).
-//REMEMBER: ALL DATA ARE LOAD IN MEMORY
-
-
+/**
+ * Loads puzzles on demand from Connections_Data.json by streaming
+ * through the JSON array until the requested gameId is found.
+ *
+ * Only one puzzle object is ever in memory at a time.
+ * The file is read at most once per game (every few minutes), so
+ * the linear scan cost is completely negligible.
+ */
 public class PuzzleStorage {
 
     private static final Logger LOG = Logger.getLogger(PuzzleStorage.class.getName());
-    private static final Gson GSON = new Gson();
+
     private final Path dataFile;
-    private final Map<Integer, Puzzle> cache = new HashMap<>(); // cache: gameId -> Puzzle
+    private final int  totalPuzzles;
 
     public PuzzleStorage(String dataFilePath) throws IOException {
         this.dataFile = Paths.get(dataFilePath);
-
         if (!Files.exists(dataFile)) {
             throw new IOException("Puzzle data file not found: " + dataFile);
         }
-
-        loadAllPuzzles();
-        LOG.info("PuzzleStorage: loaded " + cache.size() + " puzzles into memory.");
+        this.totalPuzzles = countPuzzles();
+        LOG.info("PuzzleStorage: found " + totalPuzzles + " puzzles in " + dataFile);
     }
 
-    public int getTotalPuzzles() { return cache.size(); }
+    public int getTotalPuzzles() {
+        return totalPuzzles;
+    }
 
+    /**
+     * Streams through the JSON array until the puzzle with the given
+     * gameId is found, then parses and returns it.
+     *
+     * @throws IOException if the gameId is not found or the file is unreadable.
+     */
     public Puzzle loadPuzzle(int gameId) throws IOException {
-        Puzzle p = cache.get(gameId);
-        if (p == null) {
-            throw new IOException("No puzzle with gameId " + gameId);
+        try (JsonReader reader = new JsonReader(new FileReader(dataFile.toFile()))) {
+            reader.beginArray();
+            while (reader.hasNext()) {
+                // parse one element at a time as a JsonObject
+                JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
+                if (obj.get("gameId").getAsInt() == gameId) {
+                    return parsePuzzle(obj);
+                }
+                // not the one we need: the element is already consumed, just continue
+            }
+            reader.endArray();
         }
-        return p;
+        throw new IOException("No puzzle with gameId " + gameId + " found in file");
     }
 
-    private void loadAllPuzzles() throws IOException {
-        try (Reader r = new FileReader(dataFile.toFile())) {
+    // ── Internal ──────────────────────────────────────────────────────────
 
-            JsonArray arr = JsonParser.parseReader(r).getAsJsonArray();
-
-            for (var elem : arr) {
-                Puzzle p = parsePuzzle(elem.getAsJsonObject());
-                cache.put(p.getGameId(), p);
+    /**
+     * Counts the puzzles in the file by streaming through it once.
+     * Only called at startup.
+     */
+    private int countPuzzles() throws IOException {
+        int count = 0;
+        try (JsonReader reader = new JsonReader(new FileReader(dataFile.toFile()))) {
+            reader.beginArray();
+            while (reader.hasNext()) {
+                reader.skipValue(); // skip the whole object without parsing it
+                count++;
             }
+            reader.endArray();
         }
+        return count;
     }
 
     private Puzzle parsePuzzle(JsonObject obj) {
-
         int gameId = obj.get("gameId").getAsInt();
         List<PuzzleGroup> groups = new ArrayList<>();
-
         for (var element : obj.getAsJsonArray("groups")) {
             JsonObject g = element.getAsJsonObject();
             String theme = g.get("theme").getAsString();
             List<String> words = new ArrayList<>();
-
             for (var w : g.getAsJsonArray("words")) {
                 words.add(w.getAsString().toUpperCase());
             }

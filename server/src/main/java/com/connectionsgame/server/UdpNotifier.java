@@ -42,15 +42,14 @@ public class UdpNotifier {
 
     /**
      * Send a "game over" notification to every connected client.
-     *
-     * @param game       The game that just ended.
+     * game: The game that just ended.
      * The session registry (ClientSessionRegistry) is looked up via the static
      * accessor to avoid a circular dependency with NioServer.
      */
     public void broadcastGameOver(GameSession game) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("type",           "gameOver");
-        payload.put("gameId",         game.getGameId());
+        payload.put("type", "gameOver");
+        payload.put("gameId", game.getGameId());
         payload.put("remainingSeconds", 0);
 
         String json = GSON.toJson(payload);
@@ -65,20 +64,18 @@ public class UdpNotifier {
 
     /**
      * Send an arbitrary JSON string to one specific client via UDP.
-     *
-     * @param address  The client's IP address (from the TCP connection).
-     * @param port     The UDP port the client registered at login.
-     * @param json     The JSON payload to send.
+     * address:  The client's IP address (from the TCP connection).
+     * port: The UDP port the client registered at login.
+     * json: The JSON payload to send.
      */
     public void sendTo(InetAddress address, int port, String json) {
-        if (address == null || port <= 0) return;
+        if (address == null || port <= 0) {return;}
         byte[] data = json.getBytes(StandardCharsets.UTF_8);
         DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
         try {
             socket.send(packet);
         } catch (Exception e) {
-            LOG.warning("UdpNotifier: failed to send to " + address + ":" + port
-                    + " — " + e.getMessage());
+            LOG.warning("UdpNotifier: failed to send to " + address + ":" + port + " — " + e.getMessage());
         }
     }
 

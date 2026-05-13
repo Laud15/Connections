@@ -4,7 +4,7 @@ import com.connectionsgame.abstract_class.Response;
 
 public class LogoutResponse extends Response {
 
-    static private final String operation = "logoutResponse";
+    private final String operation = "logoutResponse";
     private final String message;
 
     public LogoutResponse(String message){

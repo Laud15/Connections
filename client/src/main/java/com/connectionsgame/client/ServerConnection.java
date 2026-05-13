@@ -1,8 +1,6 @@
 package com.connectionsgame.client;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -57,53 +55,7 @@ public class ServerConnection {
         }
     }
 
-    /**
-     * Send a raw JSON string (used when building requests manually in the CLI).
-     */
-    public void sendRaw(String json) throws IOException {
-        String message = json.endsWith("\n") ? json : json + "\n";
-        ByteBuffer buf = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
-        while (buf.hasRemaining()) {
-            channel.write(buf);
-        }
-    }
-
     // ── Receive ───────────────────────────────────────────────────────────
-
-    /**
-     * Block until a complete '\n'-terminated JSON response is received.
-     *
-     * @return the parsed JsonObject response from the server.
-     * @throws IOException if the connection is closed or a read error occurs.
-     */
-    public JsonObject receive() throws IOException {
-        // First check if we already have a complete message buffered
-        int newlineIdx = messageAccumulator.indexOf("\n");
-        while (newlineIdx == -1) {
-            // Need more bytes
-            readBuffer.clear();
-            int bytesRead = channel.read(readBuffer);
-            if (bytesRead == -1) throw new IOException("Server closed the connection");
-
-            readBuffer.flip();
-            messageAccumulator.append(
-                    StandardCharsets.UTF_8.decode(readBuffer).toString()
-            );
-            newlineIdx = messageAccumulator.indexOf("\n");
-        }
-
-        // Extract the first complete message
-        String json = messageAccumulator.substring(0, newlineIdx).trim();
-        messageAccumulator.delete(0, newlineIdx + 1);
-        return JsonParser.parseString(json).getAsJsonObject();
-    }
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────
-
-    public boolean isConnected() {
-        return channel.isConnected();
-    }
-
 
     /**
      * Block until a complete '\n'-terminated message is received, and return
@@ -114,16 +66,14 @@ public class ServerConnection {
      *
      * @throws IOException if the connection is closed or a read error occurs.
      */
-    public String receiveRaw() throws IOException {
+    public String receive() throws IOException {
         int newlineIdx = messageAccumulator.indexOf("\n");
         while (newlineIdx == -1) {
             readBuffer.clear();
             int bytesRead = channel.read(readBuffer);
             if (bytesRead == -1) throw new IOException("Server closed the connection");
             readBuffer.flip();
-            messageAccumulator.append(
-                    java.nio.charset.StandardCharsets.UTF_8.decode(readBuffer).toString()
-            );
+            messageAccumulator.append(StandardCharsets.UTF_8.decode(readBuffer));
             newlineIdx = messageAccumulator.indexOf("\n");
         }
         String json = messageAccumulator.substring(0, newlineIdx).trim();

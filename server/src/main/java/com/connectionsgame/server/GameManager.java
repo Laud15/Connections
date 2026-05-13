@@ -7,25 +7,23 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 /**
  * Central coordinator for the game lifecycle.
- *
  * Responsibilities:
  *   1. Starting a new game (loading the next puzzle via PuzzleStorage).
  *   2. Validating and applying player proposals.
  *   3. Ending games (on timer expiry).
  *   4. Providing query methods used by all request handlers.
- *
  * Concurrency:
- *   - "currentGame" is protected by a ReadWriteLock:
- *       * Many request-handler threads hold the READ lock simultaneously.
- *       * Only the game-rotation task holds the WRITE lock when swapping games.
+ *   - "currentGame" is an AtomicReference: swapping the game reference is
+ *     atomic and immediately visible to all threads, with no locking needed.
  *   - Per-player mutations (proposal submission) lock the PlayerGameState
  *     object itself, keeping the critical section as narrow as possible.
- *
+ *   - nextGameId is only ever touched by the single-thread game-timer, so
+ *     it needs no synchronization.
  * Puzzle selection:
  *   Puzzles are identified by their gameId (0-based, 0..911 in the data file).
  *   The server's own game counter (nextGameId, 1-based) is mapped to a
@@ -37,20 +35,17 @@ public class GameManager {
 
     private static final Logger LOG = Logger.getLogger(GameManager.class.getName());
 
-    private final PuzzleStorage  puzzleStorage;
-    private final UserStorage    userStorage;
-    private final GameStorage    gameStorage;
-    private final UdpNotifier    udpNotifier;
-    private final int            gameDurationMinutes;
-
-    /** The single currently active game. Null before the first game starts. */
-    private volatile GameSession currentGame;
+    private final PuzzleStorage puzzleStorage;
+    private final UserStorage userStorage;
+    private final GameStorage gameStorage;
+    private final UdpNotifier udpNotifier;
+    private final int gameDurationMinutes;
 
     /**
-     * ReadWriteLock protecting currentGame.
-     * Multiple threads read it concurrently; the rotation task writes exclusively.
+     * The single currently active game.
+     * AtomicReference makes get/set atomic and visible to all threads without locking.
      */
-    private final ReadWriteLock gameLock = new ReentrantReadWriteLock();
+    private final AtomicReference<GameSession> currentGame = new AtomicReference<>(null);
 
     /**
      * Single-thread scheduler that fires game-end events.
@@ -66,10 +61,15 @@ public class GameManager {
     /**
      * Server-side game counter, 1-based (game #1, #2, ...).
      * Initialised from disk so the server resumes where it left off.
+     * Only accessed by the game-timer thread, no synchronization needed.
      */
     private int nextGameId;
 
-    public GameManager(PuzzleStorage puzzleStorage, UserStorage   userStorage, GameStorage   gameStorage, UdpNotifier   udpNotifier, int gameDurationMinutes) {
+    public GameManager(PuzzleStorage puzzleStorage,
+                       UserStorage userStorage,
+                       GameStorage gameStorage,
+                       UdpNotifier udpNotifier,
+                       int gameDurationMinutes) {
         this.puzzleStorage = puzzleStorage;
         this.userStorage = userStorage;
         this.gameStorage = gameStorage;
@@ -82,8 +82,7 @@ public class GameManager {
     // ── Game lifecycle ────────────────────────────────────────────────────
 
     /**
-     * Starts the next game.  Called once at server boot and after each game ends.
-     *
+     * Starts the next game. Called once at server boot and after each game ends.
      * The puzzle gameId wraps around using modulo so the server can run
      * indefinitely even with only 912 puzzles in the data file.
      */
@@ -99,13 +98,8 @@ public class GameManager {
         int thisGameId = nextGameId;
         nextGameId++;
 
-        // Write lock: swap the current game reference atomically
-        gameLock.writeLock().lock();
-        try {
-            currentGame = newGame;
-        } finally {
-            gameLock.writeLock().unlock();
-        }
+        // Atomically publish the new game — all threads see it immediately
+        currentGame.set(newGame);
 
         LOG.info("GameManager: started server game #" + thisGameId
                 + " using puzzle gameId=" + puzzleGameId
@@ -122,14 +116,10 @@ public class GameManager {
 
     /**
      * Ends the game with the given server gameId.
-     *
      * Idempotent: if called for an already-replaced game (stale timer), does nothing.
      */
     public void endGame(int gameId) {
-        GameSession game;
-        gameLock.readLock().lock();
-        try { game = currentGame; }
-        finally { gameLock.readLock().unlock(); }
+        GameSession game = currentGame.get();
 
         if (game == null || game.getGameId() != gameId) {
             return; // stale timer firing, game already replaced
@@ -138,9 +128,7 @@ public class GameManager {
         LOG.info("GameManager: ending game #" + gameId);
 
         // Mark all unfinished players as timed-out
-        game.getAllPlayerStates().forEach((username, state) -> {
-            synchronized (state) { state.markTimedOut(); }
-        });
+        game.markAllPlayersTimedOut();
 
         // Persist the result and update user stats
         try {
@@ -166,23 +154,18 @@ public class GameManager {
 
     /**
      * Validates and applies a player's group proposal.
-     *
      * Validation rules (from the spec):
      *   - Must contain exactly 4 words.
      *   - All words must be part of the current puzzle.
      *   - No word may already be correctly grouped by this player.
      *   Violations are MALFORMED errors: they do NOT count as mistakes.
-     *
-     * @return a ProposalResult describing the outcome.
+     * return a ProposalResult describing the outcome.
      */
     public ProposalResult submitProposal(String username, List<String> words) {
-        gameLock.readLock().lock();
-        GameSession game;
-        try { game = currentGame; }
-        finally { gameLock.readLock().unlock(); }
+        GameSession game = currentGame.get();
 
-        if (game == null)      return ProposalResult.error("No active game");
-        if (game.isExpired())  return ProposalResult.error("The game has already ended");
+        if (game == null) {return ProposalResult.error("No active game");}
+        if (game.isExpired()) {return ProposalResult.error("The game has already ended");}
 
         PlayerGameState state = game.getOrCreatePlayerState(username);
 
@@ -196,8 +179,8 @@ public class GameManager {
                 return ProposalResult.malformed("A proposal must contain exactly 4 words");
             }
 
-            Puzzle       puzzle    = game.getPuzzle();
-            List<String> allWords  = puzzle.getAllWords();
+            Puzzle puzzle = game.getPuzzle();
+            List<String> allWords = puzzle.getAllWords();
             List<String> remaining = state.getRemainingWords(puzzle);
 
             for (String w : words) {
@@ -228,7 +211,7 @@ public class GameManager {
     // ── Query methods ─────────────────────────────────────────────────────
 
     public GameSession getCurrentGame() {
-        return currentGame;
+        return currentGame.get();
     }
 
     public GameResult getHistoricalGame(int gameId) {
@@ -290,21 +273,25 @@ public class GameManager {
 
         public enum Kind { CORRECT, WRONG, MALFORMED, ERROR }
 
-        private final Kind        kind;
+        private final Kind kind;
         private final PuzzleGroup matchedGroup; // non-null only for CORRECT
-        private final int         currentScore;
-        private final int         mistakeCount;
-        private final boolean     gameOver;
-        private final String      message;
+        private final int currentScore;
+        private final int mistakeCount;
+        private final boolean gameOver;
+        private final String message;
 
-        private ProposalResult(Kind kind, PuzzleGroup matchedGroup, int currentScore,
-                               int mistakeCount, boolean gameOver, String message) {
-            this.kind         = kind;
+        private ProposalResult(Kind kind,
+                               PuzzleGroup matchedGroup,
+                               int currentScore,
+                               int mistakeCount,
+                               boolean gameOver,
+                               String message) {
+            this.kind = kind;
             this.matchedGroup = matchedGroup;
             this.currentScore = currentScore;
             this.mistakeCount = mistakeCount;
-            this.gameOver     = gameOver;
-            this.message      = message;
+            this.gameOver = gameOver;
+            this.message = message;
         }
 
         public static ProposalResult correct(PuzzleGroup group, int score, boolean won) {
@@ -320,7 +307,7 @@ public class GameManager {
             return new ProposalResult(Kind.ERROR, null, 0, 0, false, msg);
         }
 
-        public Kind getKind(){ return kind; }
+        public Kind getKind() {return kind;}
         public PuzzleGroup getMatchedGroup() { return matchedGroup; }
         public int getCurrentScore() { return currentScore; }
         public int getMistakeCount() { return mistakeCount; }

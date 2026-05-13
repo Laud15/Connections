@@ -191,7 +191,7 @@ public class ClientMain {
 
     private static void doGameInfo(ServerConnection conn, String[] parts) throws Exception {
         int gameId = parts.length >= 2 ? Integer.parseInt(parts[1]) : -1;
-        conn.send(new RequestGameInfoRequest(gameId));
+        conn.send(new GameInfoRequest(gameId));
         Response resp = deserialize(conn);
         if (resp instanceof GameInfoResponse r) {
             System.out.println("\n── Game #" + r.getGameId()
@@ -222,7 +222,7 @@ public class ClientMain {
 
     private static void doGameStats(ServerConnection conn, String[] parts) throws Exception {
         int gameId = parts.length >= 2 ? Integer.parseInt(parts[1]) : -1;
-        conn.send(new RequestGameStatsRequest(gameId));
+        conn.send(new GameStatsRequest(gameId));
         Response resp = deserialize(conn);
         if (resp instanceof GameStatsResponse r) {
             System.out.println("\n── Game #" + r.getGameId()
@@ -248,9 +248,9 @@ public class ClientMain {
             if (parts[i].startsWith("top="))    topK       = Integer.parseInt(parts[i].substring(4));
             if (parts[i].startsWith("player=")) playerName = parts[i].substring(7);
         }
-        conn.send(new RequestLeaderboardRequest(playerName, topK));
+        conn.send(new LeaderBoardRequest(playerName, topK));
         Response resp = deserialize(conn);
-        if (resp instanceof LeadBoardResponse r) {
+        if (resp instanceof LeaderBoardResponse r) {
             if (r.getLeaderboard() != null) {
                 System.out.println("\n── Leaderboard ──");
                 r.getLeaderboard().forEach(e ->
@@ -264,7 +264,7 @@ public class ClientMain {
     }
 
     private static void doMyStats(ServerConnection conn) throws Exception {
-        conn.send(new RequestPlayerStatsRequest());
+        conn.send(new PlayerStatsRequest());
         Response resp = deserialize(conn);
         if (resp instanceof PlayerStatsResponse r) {
             System.out.println("\n── Your Statistics ──");
@@ -274,12 +274,11 @@ public class ClientMain {
             System.out.println("Current Streak    : " + r.getCurrentStreak());
             System.out.println("Max Streak        : " + r.getMaxStreak());
             System.out.println("Perfect Puzzles   : " + r.getPerfectPuzzles());
-            System.out.println("Mistake Histogram :");
+            System.out.println("\nMistake Histogram :");
             int[] hist = r.getMistakeHistogram();
             for (int i = 0; i < hist.length; i++) {
-                System.out.printf("  %d mistake%s: %d game%s%n",
-                        i, i == 1 ? "" : "s",
-                        hist[i], hist[i] == 1 ? "" : "s");
+                String bar = "#".repeat(Math.max(0, hist[i]));
+                System.out.printf("  %d mistakes: %s (%d games)%n", i, bar, hist[i]);
             }
         }
     }
@@ -291,7 +290,7 @@ public class ClientMain {
      * If it's an error, prints the error message and returns the ErrorResponse.
      */
     private static Response deserialize(ServerConnection conn) throws Exception {
-        String raw = conn.receiveRaw();
+        String raw = conn.receive();
         Response resp = ResponseDeserializer.parse(raw);
         if (resp instanceof ErrorResponse e) {
             System.out.println("SERVER ERROR " + e.getErrorCode()

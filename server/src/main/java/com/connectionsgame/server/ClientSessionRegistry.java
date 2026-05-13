@@ -6,7 +6,11 @@ import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
 //global registry of active client sessions
-
+//this class is used when:
+// a client connect to te server ( ,
+// when a client disconnect himself,
+// when there is an udp broadcast
+//the concurrency is handled by ConcurrentHashMap
 public class ClientSessionRegistry {
     private static final ConcurrentHashMap<SocketChannel, ClientSession> SESSIONS = new ConcurrentHashMap<>();
 

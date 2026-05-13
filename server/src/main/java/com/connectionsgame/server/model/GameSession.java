@@ -49,24 +49,24 @@ public class GameSession {
 
     public int getTotalPlayersJoined() { return playerStates.size(); }
     
-    public long getPlayersStillPlaying() {
-        return playerStates.values().stream()
+    public int getPlayersStillPlaying() {
+        return (int) playerStates.values().stream()
             .filter(s->{
                 synchronized(s) { return !s.isFinished(); }
             })
             .count();
     }
 
-    public long getPlayersFinished() {
-        return playerStates.values().stream()
+    public int getPlayersFinished() {
+        return (int) playerStates.values().stream()
             .filter(ps -> {
                 synchronized(ps) { return ps.isFinished(); }
             })
             .count();
     }
 
-    public long getPlayersWon() {
-        return playerStates.values().stream()
+    public int getPlayersWon() {
+        return (int) playerStates.values().stream()
             .filter(ps -> {
                 synchronized(ps) { return ps.isWon(); }
             })
@@ -89,4 +89,18 @@ public class GameSession {
     public Instant getEndTime() { return endTime; }
 
     public Map<String, PlayerGameState> getAllPlayerStates() { return Collections.unmodifiableMap(playerStates); }
+
+    /**
+     * Marks all players who haven't finished as timed out
+     * Used when the game time expires to end the game for all players at once.
+     */
+    public void markAllPlayersTimedOut() {
+        playerStates.values().forEach(ps -> {
+            synchronized (ps) {
+                if (!ps.isFinished()) {
+                    ps.markTimedOut();
+                }
+            }
+        });
+    }
 }

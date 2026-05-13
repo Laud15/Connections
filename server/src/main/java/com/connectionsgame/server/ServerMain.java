@@ -39,8 +39,11 @@ public class ServerMain {
 
         // ── 4. Game manager + first game ──────────────────────────────────
         GameManager gameManager = new GameManager(
-                puzzleStorage, userStorage, gameStorage,
-                udpNotifier, config.getGameDurationMinutes());
+                puzzleStorage,
+                userStorage,
+                gameStorage,
+                udpNotifier,
+                config.getGameDurationMinutes());
         gameManager.startNextGame();
 
         // ── 5. Periodic persistence ───────────────────────────────────────
@@ -76,7 +79,8 @@ public class ServerMain {
         );
 
         // Register shutdown hook so Ctrl+C triggers a clean flush
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        Runtime.getRuntime().addShutdownHook(
+                new Thread(() -> {
             LOG.info("Shutdown hook: flushing user data...");
             userStorage.saveAll();
             udpNotifier.close();

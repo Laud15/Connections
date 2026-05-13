@@ -51,9 +51,9 @@ public class NioServer implements Runnable {
 
     private static final Logger LOG = Logger.getLogger(NioServer.class.getName());
 
-    private final int           tcpPort;
-    private final GameManager   gameManager;
-    private final UserStorage   userStorage;
+    private final int tcpPort;
+    private final GameManager gameManager;
+    private final UserStorage userStorage;
     private final ThreadPoolExecutor threadPool;
     private Selector selector;
 
@@ -67,10 +67,12 @@ public class NioServer implements Runnable {
     private static final AtomicInteger WORKER_COUNT = new AtomicInteger(0);
 
     public NioServer(int tcpPort, int poolCore, int poolMax,
-                     long keepAliveSeconds, int queueCapacity,
-                     GameManager gameManager, UserStorage userStorage) {
+                     long keepAliveSeconds,
+                     int queueCapacity,
+                     GameManager gameManager,
+                     UserStorage userStorage) {
 
-        this.tcpPort     = tcpPort;
+        this.tcpPort = tcpPort;
         this.gameManager = gameManager;
         this.userStorage = userStorage;
 
@@ -116,11 +118,11 @@ public class NioServer implements Runnable {
                     SelectionKey key = keys.next();
                     keys.remove();
 
-                    if (!key.isValid()) continue;
+                    if (!key.isValid()) {continue;}
 
-                    if (key.isAcceptable()) accept(serverChannel, key);
-                    else if (key.isReadable()) read(key);
-                    else if (key.isWritable()) write(key);
+                    if (key.isAcceptable()) {accept(serverChannel, key);}
+                    else if (key.isReadable()) {read(key);}
+                    else if (key.isWritable()) {write(key);}
                 }
             }
         } catch (IOException e) {
@@ -170,8 +172,8 @@ public class NioServer implements Runnable {
         // Look for complete messages (each terminated by '\n')
         buf.flip();
         byte[] array = buf.array();
-        int    limit = buf.limit();
-        int    start = 0;
+        int limit = buf.limit();
+        int start = 0;
 
         for (int i = 0; i < limit; i++) {
             if (array[i] == '\n') {
@@ -182,8 +184,11 @@ public class NioServer implements Runnable {
                 if (!message.isEmpty()) {
                     // Submit to thread pool; the WriteCallback will queue the response
                     RequestHandler handler = new RequestHandler(
-                            message, session, gameManager, userStorage,
-                            this::enqueueResponse
+                            message,
+                            session,
+                            gameManager,
+                            userStorage,
+                            (cs, response) -> this.enqueueResponse(cs, response)
                     );
                     threadPool.submit(handler);
                 }
@@ -197,10 +202,12 @@ public class NioServer implements Runnable {
 
     // ── Write ─────────────────────────────────────────────────────────────
 
-    private void write(SelectionKey key) {
+    //Finishes a partial write left over from drainPendingWrites().
+    // Called by the Selector only when OP_WRITE is active, which happens only when a previous channel.write() could not send all bytes at once
+    private void write(SelectionKey key) {//
         ClientSession session = (ClientSession) key.attachment();
         SocketChannel channel = session.getChannel();
-        ByteBuffer    buf     = session.getWriteBuffer();
+        ByteBuffer buf = session.getWriteBuffer();
 
         buf.flip();
         try {
@@ -225,7 +232,7 @@ public class NioServer implements Runnable {
      * Adds it to the lock-free queue and wakes the Selector.
      */
     private void enqueueResponse(ClientSession session, String responseJson) {
-        pendingWrites.add(new PendingWrite(session, responseJson));
+        pendingWrites.add(new PendingWrite(session, responseJson));//fill pendigWrites with the response of the request
         selector.wakeup(); // wake up selector.select() so it drains the queue immediately
     }
 
@@ -235,7 +242,7 @@ public class NioServer implements Runnable {
      */
     private void drainPendingWrites() {
         PendingWrite pw;
-        while ((pw = pendingWrites.poll()) != null) {
+        while ((pw = pendingWrites.poll()) != null) {//poll return null if the queue is empty otherwise return the head of the queue
             ClientSession session = pw.session;
             byte[] bytes = pw.responseJson.getBytes(StandardCharsets.UTF_8);
             ByteBuffer writeBuf = session.getWriteBuffer();

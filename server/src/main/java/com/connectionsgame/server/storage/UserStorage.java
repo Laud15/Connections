@@ -18,6 +18,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
+//the UserStorage class use an IndexFile that contains the couple of {username:id}
+//the IndexFile is necessary to associate the Username to the id that give the name of user's file
+//an alternative is use only the username to name to identifier the user's file, but it would have required the rename of the file
+//the save operation are done inside synchronized method/block to prevent race condition
+
 public class UserStorage {
 
     private static final Logger LOG = Logger.getLogger(UserStorage.class.getName());
@@ -26,6 +31,7 @@ public class UserStorage {
     private final Path indexFile;
 
     //id->user (lazy, load from disk on demand)
+    //the program doesn't have a way to remove a user so a possible upgrade will be to define a cut policy
     private final ConcurrentHashMap<Integer, User> cache = new ConcurrentHashMap<>();
     //username->id (load at the start, always complete)
     private final ConcurrentHashMap<String, Integer> usernameToId = new ConcurrentHashMap<>();
@@ -40,6 +46,7 @@ public class UserStorage {
         LOG.info("UserStorage: initialized, user dir = " + this.userDir);
     }
 
+    //load the index that contains all the {username: id}s
     private void loadIndex() throws IOException{
         if(!Files.exists(indexFile)) {return;}
         try (Reader r = new FileReader(indexFile.toFile())){
@@ -107,14 +114,15 @@ public class UserStorage {
     }
 
     public User getById(int id){
-        User cached = cache.get(id);
-        if(cached != null) {return cached;}
-        return loadFromDisk(id);
+        // ✅ FIXED: Use computeIfAbsent for atomic, single-load guarantee
+        // If already cached → returns immediately
+        // If not cached → loads EXACTLY ONCE, even with 100 concurrent threads
+        return cache.computeIfAbsent(id, this::loadFromDiskNoCache);
     }
 
     public List<User> getLeaderboard() {
         usernameToId.values().forEach(id ->
-                cache.computeIfAbsent(id, (i)->this.loadFromDisk(i))
+                cache.computeIfAbsent(id, this::loadFromDiskNoCache)
         );
         List<User> sorted = new ArrayList<>(cache.values());
         sorted.sort(Comparator.comparingInt((User user)->user.getTotalScore()).reversed());
@@ -137,16 +145,20 @@ public class UserStorage {
         });
     }
 
-    private User loadFromDisk(int id) {
+    /**
+     * Load a user from disk WITHOUT putting it in cache.
+     * The caller (computeIfAbsent) handles the atomic put.
+     * This ensures only ONE disk read happens per uncached user, regardless of concurrent threads.
+     */
+    private User loadFromDiskNoCache(int id) {
         Path path = userDir.resolve(id + "_user.json");
         if (!Files.exists(path)) return null;
         try (Reader r = new FileReader(path.toFile())){
-            User user = GSON.fromJson(r, User.class);
-            if(user != null){cache.putIfAbsent(id, user);}
-            return cache.get(id);
+            return GSON.fromJson(r, User.class);
         } catch (IOException e){
             LOG.warning("could not load user id = "+ id + ": " + e.getMessage());
             return null;
+
         }
     }
 

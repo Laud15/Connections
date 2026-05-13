@@ -9,7 +9,7 @@ public class LoginRequest extends Request {
     private final int udpPort;
 
     public LoginRequest(String username, String pwd, int udpPort){
-        super("requestLogin");
+        super("login");
         this.username = username;
         this.pwd = pwd;
         this.udpPort = udpPort;

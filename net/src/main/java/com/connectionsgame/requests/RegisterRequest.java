@@ -10,7 +10,7 @@ public class RegisterRequest extends Request{
     private final String psw;
 
     public RegisterRequest(String name, String psw){
-        super("requestRegister");
+        super("register");
         this.name=name;
         this.psw=psw;
     }

@@ -11,7 +11,7 @@ public class UpdateCredentialsRequest extends Request {
     private final String newPsw;  // null if not changing
 
     public UpdateCredentialsRequest(String oldName, String oldPsw, String newName, String newPsw) {
-        super("requestUpdateCredentials");
+        super("updateCredentials");
         this.oldName = oldName;
         this.oldPsw  = oldPsw;
         this.newName = newName;
