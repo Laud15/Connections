@@ -6,6 +6,7 @@ import com.connectionsgame.client.config.ClientConfig;
 import com.connectionsgame.requests.*;
 import com.connectionsgame.responses.*;
 
+import java.net.SocketException;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -44,9 +45,15 @@ public class ClientMain {
         }
 
         // ── UDP listener (async game-over notifications) ───────────────────
-        UdpListener udpListener = new UdpListener(config.getLocalUdpPort());
-        udpListener.start();
-
+        UdpListener udpListener;
+        try {
+            udpListener = new UdpListener(config.getLocalUdpPort());
+            udpListener.start();
+        }catch(SocketException e){
+            System.err.println("ERROR: Cannot open UDP socket - " + e.getMessage());
+            System.exit(1);
+            return;
+        }
         // ── TCP connection to server ──────────────────────────────────────
         ServerConnection conn;
         try {
@@ -79,7 +86,7 @@ public class ClientMain {
                     case "quit", "exit"      -> running = false;
                     case "register"          -> doRegister(conn, parts);
                     case "updatecredentials" -> doUpdateCredentials(conn, parts);
-                    case "login"             -> doLogin(conn, parts, config.getLocalUdpPort());
+                    case "login"             -> doLogin(conn, parts, udpListener.getLocalPort());
                     case "logout"            -> doLogout(conn);
                     case "propose"           -> doPropose(conn, parts);
                     case "gameinfo"          -> doGameInfo(conn, parts);
@@ -170,9 +177,17 @@ public class ClientMain {
     private static void doPropose(ServerConnection conn, String[] parts) throws Exception {
         if (parts.length < 5) {
             System.out.println("Usage: propose <w1> <w2> <w3> <w4>");
+            System.out.println("  (Use underscore for multi-word phrases, e.g., Ice_Cube)");
             return;
         }
-        conn.send(new SubmitProposalRequest(List.of(parts[1], parts[2], parts[3], parts[4])));
+        // Convert underscores to spaces for multi-word phrases
+        List<String> words = List.of(
+                parts[1].replace('_', ' '),
+                parts[2].replace('_', ' '),
+                parts[3].replace('_', ' '),
+                parts[4].replace('_', ' ')
+        );
+        conn.send(new SubmitProposalRequest(words));
         Response resp = deserialize(conn);
         if (resp instanceof SubmitProposalResponse r) {
             if (r.isCorrect()) {
@@ -316,7 +331,8 @@ public class ClientMain {
                   updatecredentials <oldName> <oldPsw> [newname=<n>] [newpsw=<p>]
                   login <username> <password>
                   logout
-                  propose <word1> <word2> <word3> <word4>
+                  propose <w1> <w2> <w3> <w4>
+                    (Use underscore for multi-word phrases, e.g., propose Ice_Cube Apple Orange Banana)
                   gameinfo [gameId]        (omit for current game)
                   gamestats [gameId]
                   leaderboard [top=K | player=<name>]

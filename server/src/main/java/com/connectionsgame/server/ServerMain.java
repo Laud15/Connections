@@ -57,6 +57,7 @@ public class ServerMain {
                     t.setDaemon(true);
                     return t;
                 });
+
         persistenceScheduler.scheduleAtFixedRate(
                 () -> {
                     LOG.fine("Periodic persistence flush...");

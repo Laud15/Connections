@@ -55,11 +55,16 @@ public class UdpNotifier {
         String json = GSON.toJson(payload);
 
         // Ask the registry for all currently connected clients' UDP addresses
-        ClientSessionRegistry.getAllSessions().forEach(session -> {
+        int sentCount = 0;
+        for (ClientSession session : ClientSessionRegistry.getAllSessions()) {
             if (session.isLoggedIn()) {
+                LOG.info("UdpNotifier: sending gameOver to " + session.getLoggedInUserName()
+                        + " at " + session.getClientAddress() + ":" + session.getUdpPort());
                 sendTo(session.getClientAddress(), session.getUdpPort(), json);
+                sentCount++;
             }
-        });
+        }
+        LOG.info("UdpNotifier: broadcast complete, sent to " + sentCount + " clients");
     }
 
     /**

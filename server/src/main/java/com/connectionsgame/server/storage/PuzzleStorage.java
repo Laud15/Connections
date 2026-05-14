@@ -81,12 +81,16 @@ public class PuzzleStorage {
     }
 
     private Puzzle parsePuzzle(JsonObject obj) {
+
         int gameId = obj.get("gameId").getAsInt();
         List<PuzzleGroup> groups = new ArrayList<>();
+
         for (var element : obj.getAsJsonArray("groups")) {
+
             JsonObject g = element.getAsJsonObject();
             String theme = g.get("theme").getAsString();
             List<String> words = new ArrayList<>();
+
             for (var w : g.getAsJsonArray("words")) {
                 words.add(w.getAsString().toUpperCase());
             }
@@ -94,4 +98,5 @@ public class PuzzleStorage {
         }
         return new Puzzle(gameId, groups);
     }
+
 }

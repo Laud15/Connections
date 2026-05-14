@@ -52,7 +52,8 @@ public class GameStorage {
     //returns the highest game id found in games directory,
     // used at server startup to resume from where we left off,
     // returns 0 if no game file exist
-    public int getLastGameId() {int maxId = 0;
+    public int getLastGameId() {
+        int maxId = 0;
         try{
             try(Stream<Path> stream = Files.list(gamesDir)) {
                 for(Path p : stream.toList()) {

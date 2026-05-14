@@ -120,13 +120,16 @@ public class UserStorage {
         return cache.computeIfAbsent(id, this::loadFromDiskNoCache);
     }
 
-    public List<User> getLeaderboard() {
-        usernameToId.values().forEach(id ->
-                cache.computeIfAbsent(id, this::loadFromDiskNoCache)
-        );
-        List<User> sorted = new ArrayList<>(cache.values());
-        sorted.sort(Comparator.comparingInt((User user)->user.getTotalScore()).reversed());
-        return sorted;
+    public synchronized List<User> getLeaderboard(){
+        List<User> users = new ArrayList<>();
+        for(Integer id: usernameToId.values()){
+            User u = loadFromDiskNoCache(id);
+            if(u != null){
+                users.add(u);
+            }
+        }
+        users.sort(Comparator.comparingInt((User user)->user.getTotalScore()).reversed());
+        return users;
     }
 
     public void saveUser(User user) throws IOException {

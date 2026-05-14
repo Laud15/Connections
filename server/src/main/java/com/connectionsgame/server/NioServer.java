@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 /**
@@ -54,7 +53,7 @@ public class NioServer implements Runnable {
     private final int tcpPort;
     private final GameManager gameManager;
     private final UserStorage userStorage;
-    private final ThreadPoolExecutor threadPool;
+    private final ExecutorService threadPool;
     private Selector selector;
 
     /**
@@ -63,8 +62,6 @@ public class NioServer implements Runnable {
      * ConcurrentLinkedQueue is lock-free for the common case.
      */
     private final Queue<PendingWrite> pendingWrites = new ConcurrentLinkedQueue<>();
-    /** Counter for unique worker thread names (avoids deprecated Thread.getId()). */
-    private static final AtomicInteger WORKER_COUNT = new AtomicInteger(0);
 
     public NioServer(int tcpPort, int poolCore, int poolMax,
                      long keepAliveSeconds,
@@ -76,21 +73,17 @@ public class NioServer implements Runnable {
         this.gameManager = gameManager;
         this.userStorage = userStorage;
 
-        // Build the thread pool with all the tunables from config
+        // Thread pool configuration (like FixedThreadPool, but with burst scaling):
+        // - corePoolSize = poolCore: threads always alive, handle steady-state load
+        // - maxPoolSize = poolMax > poolCore: temporary extra threads during traffic spikes
+        //   (temporary threads exit after keepAliveSeconds idle time)
+        // - ArrayBlockingQueue: bounded capacity; excess tasks are rejected (AbortPolicy by default)
         this.threadPool = new ThreadPoolExecutor(
                 poolCore,
-                poolMax,
+                poolMax,  // Allows temporary scaling during bursts (above core pool size)
                 keepAliveSeconds,
                 TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(queueCapacity),
-                r -> {
-                    Thread t = new Thread(r);
-                    t.setName("worker-" + WORKER_COUNT.incrementAndGet());
-                    t.setDaemon(true);
-                    return t;
-                },
-                // When queue is full: caller (Selector thread) runs the task → backpressure
-                new ThreadPoolExecutor.CallerRunsPolicy()
+                new ArrayBlockingQueue<>(queueCapacity)
         );
     }
 
@@ -190,7 +183,11 @@ public class NioServer implements Runnable {
                             userStorage,
                             (cs, response) -> this.enqueueResponse(cs, response)
                     );
-                    threadPool.submit(handler);
+                    try {
+                        threadPool.submit(handler);
+                    } catch (RejectedExecutionException e) {
+                        LOG.severe("NioServer: Task rejected by thread pool: " + e.getMessage());
+                    }
                 }
             }
         }
