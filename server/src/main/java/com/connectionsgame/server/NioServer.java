@@ -26,20 +26,12 @@ import java.util.logging.Logger;
  *
  *  ThreadPoolExecutor (worker threads):
  *    - Runs RequestHandler instances (pure business logic, no I/O).
- *    - When a handler finishes, it calls the WriteCallback, which adds the
- *      response to a per-session pending-writes queue and wakes up the Selector.
- *    - Worker threads NEVER write to a SocketChannel directly — only the
- *      Selector thread does.  This eliminates all I/O concurrency bugs.
+ *    - When a handler finishes, it calls the WriteCallback, which adds the response to a per-session pending-writes queue and wakes up the Selector.
+ *    - Worker threads NEVER write to a SocketChannel directly — only the Selector thread does. This eliminates all I/O concurrency bugs.
  *
  * ── Thread pool sizing ───────────────────────────────────────────────────────
- *   coreSize  = CPU cores       (always alive, handle steady-state load)
- *   maxSize   = CPU cores × 4   (burst capacity without unbounded growth)
- *   queue     = bounded (200)   + CallerRunsPolicy
- *
- *   CallerRunsPolicy means: if the queue is full AND all max threads are busy,
- *   the Selector thread itself runs the task.  This naturally throttles new
- *   I/O reads (backpressure) without dropping requests or throwing exceptions.
- *   It's the recommended policy for compute-bound tasks with a known max concurrency.
+ *   - coreSize  = CPU cores       (always alive, handle steady-state load)
+ *   - maxSize   = CPU cores × 4   (burst capacity without unbounded growth)
  *
  * ── Message framing ──────────────────────────────────────────────────────────
  *   Each message is a single JSON object terminated by a newline '\n'.
@@ -63,7 +55,9 @@ public class NioServer implements Runnable {
      */
     private final Queue<PendingWrite> pendingWrites = new ConcurrentLinkedQueue<>();
 
-    public NioServer(int tcpPort, int poolCore, int poolMax,
+    public NioServer(int tcpPort,
+                     int poolCore,
+                     int poolMax,
                      long keepAliveSeconds,
                      int queueCapacity,
                      GameManager gameManager,
@@ -75,9 +69,7 @@ public class NioServer implements Runnable {
 
         // Thread pool configuration (like FixedThreadPool, but with burst scaling):
         // - corePoolSize = poolCore: threads always alive, handle steady-state load
-        // - maxPoolSize = poolMax > poolCore: temporary extra threads during traffic spikes
-        //   (temporary threads exit after keepAliveSeconds idle time)
-        // - ArrayBlockingQueue: bounded capacity; excess tasks are rejected (AbortPolicy by default)
+        // - maxPoolSize = poolMax > poolCore: temporary extra threads during traffic spikes(temporary threads exit after keepAliveSeconds idle time)
         this.threadPool = new ThreadPoolExecutor(
                 poolCore,
                 poolMax,  // Allows temporary scaling during bursts (above core pool size)
@@ -129,7 +121,7 @@ public class NioServer implements Runnable {
 
     private void accept(ServerSocketChannel serverChannel, SelectionKey key) throws IOException {
         SocketChannel client = serverChannel.accept();
-        if (client == null) return;
+        if (client == null) {return;}
 
         client.configureBlocking(false);
         ClientSession session = new ClientSession(client);
@@ -145,7 +137,7 @@ public class NioServer implements Runnable {
     private void read(SelectionKey key) {
         ClientSession session = (ClientSession) key.attachment();
         SocketChannel channel = session.getChannel();
-        ByteBuffer    buf     = session.getReadBuffer();
+        ByteBuffer buf = session.getReadBuffer();
 
         int bytesRead;
         try {

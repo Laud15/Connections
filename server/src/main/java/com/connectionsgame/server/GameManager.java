@@ -46,7 +46,6 @@ public class GameManager {
      * AtomicReference makes get/set atomic and visible to all threads without locking.
      */
     private final AtomicReference<GameSession> currentGame = new AtomicReference<>(null);
-
     /**
      * Single-thread scheduler that fires game-end events.
      * Daemon so it does not block JVM shutdown.
@@ -70,6 +69,7 @@ public class GameManager {
                        GameStorage gameStorage,
                        UdpNotifier udpNotifier,
                        int gameDurationMinutes) {
+
         this.puzzleStorage = puzzleStorage;
         this.userStorage = userStorage;
         this.gameStorage = gameStorage;
@@ -89,7 +89,7 @@ public class GameManager {
     public void startNextGame() throws IOException {
         // Map server game counter (1-based) to puzzle gameId (0-based)
         int puzzleGameId = (nextGameId - 1) % puzzleStorage.getTotalPuzzles();
-        Puzzle puzzle    = puzzleStorage.loadPuzzle(puzzleGameId);
+        Puzzle puzzle = puzzleStorage.loadPuzzle(puzzleGameId);
 
         Instant now = Instant.now();
         Instant end = now.plusSeconds((long) gameDurationMinutes * 60);
@@ -193,7 +193,7 @@ public class GameManager {
                 }
             }
 
-            List<String> normalised = words.stream().map(String::toUpperCase).toList();
+            List<String> normalised = words.stream().map(s->s.toUpperCase()).toList();
 
             // ── Game logic ─────────────────────────────────────────────────
             PuzzleGroup match = puzzle.findMatchingGroup(normalised);
@@ -250,7 +250,7 @@ public class GameManager {
     private void updateUserStats(GameSession game, GameResult result) {
         result.getPlayerSummaries().forEach((username, summary) -> {
             User user = userStorage.getByUsername(username);
-            if (user == null) return;
+            if (user == null) {return;}
             synchronized (user) {
                 user.recordGameResult(
                         summary.getScore(),
@@ -286,6 +286,7 @@ public class GameManager {
                                int mistakeCount,
                                boolean gameOver,
                                String message) {
+
             this.kind = kind;
             this.matchedGroup = matchedGroup;
             this.currentScore = currentScore;
@@ -307,7 +308,7 @@ public class GameManager {
             return new ProposalResult(Kind.ERROR, null, 0, 0, false, msg);
         }
 
-        public Kind getKind() {return kind;}
+        public Kind getKind() { return kind;}
         public PuzzleGroup getMatchedGroup() { return matchedGroup; }
         public int getCurrentScore() { return currentScore; }
         public int getMistakeCount() { return mistakeCount; }

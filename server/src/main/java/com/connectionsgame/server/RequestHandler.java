@@ -17,21 +17,20 @@ import java.util.logging.Logger;
  * Lifecycle:
  *   1. NioServer receives a complete '\n'-terminated JSON message.
  *   2. NioServer submits a new RequestHandler(rawJson, session, ...) to the thread pool.
- *   3. run() parses and dispatches the request, builds a typed Response object,
- *      serializes it to JSON, and hands the result back via WriteCallback.
+ *   3. run() parses and dispatches the request, builds a typed Response object, serializes it to JSON, and hands the result back via WriteCallback.
  *   4. The Selector thread (NioServer) writes the JSON string to the SocketChannel.
  * This class holds no shared mutable state — all inputs are via constructor.
  * Thread safety is therefore guaranteed without any synchronization in this class.
  */
 public class RequestHandler implements Runnable {
 
-    private static final Logger LOG  = Logger.getLogger(RequestHandler.class.getName());
-    private static final Gson   GSON = new Gson();
+    private static final Logger LOG = Logger.getLogger(RequestHandler.class.getName());
+    private static final Gson GSON = new Gson();
 
-    private final String        rawJson;
+    private final String rawJson;
     private final ClientSession session;
-    private final GameManager   gameManager;
-    private final UserStorage   userStorage;
+    private final GameManager gameManager;
+    private final UserStorage userStorage;
     private final WriteCallback callback;
 
     /**
@@ -44,11 +43,11 @@ public class RequestHandler implements Runnable {
     }
 
     public RequestHandler(String rawJson, ClientSession session, GameManager gameManager, UserStorage userStorage, WriteCallback callback) {
-        this.rawJson     = rawJson;
-        this.session     = session;
+        this.rawJson = rawJson;
+        this.session = session;
         this.gameManager = gameManager;
         this.userStorage = userStorage;
-        this.callback    = callback;
+        this.callback = callback;
     }
 
     @Override
@@ -312,8 +311,8 @@ public class RequestHandler implements Runnable {
     /** Build an error envelope. */
     private String error(int code, String message) {
         return json(Map.of(
-                "status",       "error",
-                "errorCode",    code,
+                "status","error",
+                "errorCode",code,
                 "errorMessage", message
         ));
     }

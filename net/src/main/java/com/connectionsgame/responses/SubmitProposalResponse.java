@@ -1,9 +1,6 @@
 package com.connectionsgame.responses;
 
 import com.connectionsgame.abstract_class.Response;
-import com.connectionsgame.requests.SubmitProposalRequest;
-
-import javax.print.attribute.standard.MediaSize;
 import java.util.List;
 
 public class SubmitProposalResponse extends Response {

@@ -5,18 +5,13 @@ import com.google.gson.JsonParser;
 
 import java.net.*;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
 /**
  * Runs as a daemon thread and listens for UDP datagrams sent by the server.
- *
- * Currently handles:
- *   - "gameOver": prints a notification so the player knows the current game ended.
- *
+ *  "gameOver": prints a notification so the player knows the current game ended.
  * The listener is started once per client session and runs until the JVM exits.
- * Because it's a daemon thread, it does not prevent the JVM from shutting down
- * when the main (CLI) thread ends.
+ * Because it's a daemon thread, it does not prevent the JVM from shutting down when the main (CLI) thread ends.
  */
 public class UdpListener extends Thread {
 
@@ -74,7 +69,7 @@ public class UdpListener extends Thread {
         }
     }
 
-    /** Signal the listener to stop gracefully. */
+    //Signal the listener to stop gracefully
     public void stopListening() {
         running = false;
     }

@@ -12,10 +12,8 @@ import java.util.logging.Logger;
 
 /**
  * Command-line interface for the Connections game client.
- *
  * Uses ResponseDeserializer to turn every server response into a typed
  * Response subclass, eliminating raw JsonObject field access.
- *
  * Available commands:
  *   register <username> <password>
  *   updatecredentials <oldName> <oldPsw> [newname=<n>] [newpsw=<p>]
@@ -65,8 +63,7 @@ public class ClientMain {
         }
 
         System.out.println("=== Connections Game Client ===");
-        System.out.println("Connected to " + config.getServerHost()
-                + ":" + config.getServerTcpPort());
+        System.out.println("Connected to " + config.getServerHost() + ":" + config.getServerTcpPort());
         System.out.println("Type 'help' to see available commands.");
 
         Scanner scanner = new Scanner(System.in);
@@ -78,21 +75,21 @@ public class ClientMain {
             if (line.isEmpty()) continue;
 
             String[] parts = line.split("\\s+");
-            String   cmd   = parts[0].toLowerCase();
+            String cmd = parts[0].toLowerCase();
 
             try {
                 switch (cmd) {
-                    case "help"              -> printHelp();
-                    case "quit", "exit"      -> running = false;
-                    case "register"          -> doRegister(conn, parts);
+                    case "help" -> printHelp();
+                    case "quit" -> running = false;
+                    case "register" -> doRegister(conn, parts);
                     case "updatecredentials" -> doUpdateCredentials(conn, parts);
-                    case "login"             -> doLogin(conn, parts, udpListener.getLocalPort());
-                    case "logout"            -> doLogout(conn);
-                    case "propose"           -> doPropose(conn, parts);
-                    case "gameinfo"          -> doGameInfo(conn, parts);
-                    case "gamestats"         -> doGameStats(conn, parts);
-                    case "leaderboard"       -> doLeaderboard(conn, parts);
-                    case "mystats"           -> doMyStats(conn);
+                    case "login" -> doLogin(conn, parts, udpListener.getLocalPort());
+                    case "logout" -> doLogout(conn);
+                    case "propose" -> doPropose(conn, parts);
+                    case "gameinfo" -> doGameInfo(conn, parts);
+                    case "gamestats" -> doGameStats(conn, parts);
+                    case "leaderboard" -> doLeaderboard(conn, parts);
+                    case "mystats" -> doMyStats(conn);
                     default -> System.out.println("Unknown command '" + cmd + "'. Type 'help'.");
                 }
             } catch (Exception e) {
@@ -129,8 +126,8 @@ public class ClientMain {
         String oldName = parts[1], oldPsw = parts[2];
         String newName = null, newPsw = null;
         for (int i = 3; i < parts.length; i++) {
-            if (parts[i].startsWith("newname=")) newName = parts[i].substring(8);
-            if (parts[i].startsWith("newpsw="))  newPsw  = parts[i].substring(7);
+            if (parts[i].startsWith("newname=")) {newName = parts[i].substring(8);}
+            if (parts[i].startsWith("newpsw="))  {newPsw  = parts[i].substring(7);}
         }
         conn.send(new UpdateCredentialsRequest(oldName, oldPsw, newName, newPsw));
         Response resp = deserialize(conn);
@@ -148,6 +145,7 @@ public class ClientMain {
         Response resp = deserialize(conn);
         if (resp instanceof LoginResponse r) {
             System.out.println("✓ " + r.getMessage());
+
             if (r.getGameId() != null) {
                 System.out.println("\n── Game #" + r.getGameId() + " ──");
                 System.out.println("Time remaining : " + r.getRemainingSeconds() + "s");
@@ -206,26 +204,30 @@ public class ClientMain {
 
     private static void doGameInfo(ServerConnection conn, String[] parts) throws Exception {
         int gameId = parts.length >= 2 ? Integer.parseInt(parts[1]) : -1;
+
         conn.send(new GameInfoRequest(gameId));
+
         Response resp = deserialize(conn);
         if (resp instanceof GameInfoResponse r) {
-            System.out.println("\n── Game #" + r.getGameId()
-                    + " [" + r.getGameStatus() + "] ──");
+            System.out.println("\n── Game #" + r.getGameId() + " [" + r.getGameStatus() + "] ──");
             if ("inProgress".equals(r.getGameStatus())) {
-                System.out.println("Time remaining : " + r.getRemainingSeconds() + "s");
-                System.out.println("Mistakes       : " + r.getMistakes());
-                System.out.println("Score          : " + r.getCurrentScore());
+                System.out.println("Time remaining: " + r.getRemainingSeconds() + "s");
+                System.out.println("Mistakes: " + r.getMistakes());
+                System.out.println("Score: " + r.getCurrentScore());
+
                 if (r.getCorrectGroups() != null && !r.getCorrectGroups().isEmpty()) {
                     System.out.println("Groups found   : " + r.getCorrectGroups());
                 }
+
                 if (r.getRemainingWords() != null) {
                     System.out.println("Remaining words:");
                     printWordGrid(r.getRemainingWords());
                 }
+
             } else {
-                System.out.println("Correct groups : " + r.getCorrectCount());
-                System.out.println("Mistakes       : " + r.getMistakes());
-                System.out.println("Final score    : " + r.getFinalScore());
+                System.out.println("Correct groups: " + r.getCorrectCount());
+                System.out.println("Mistakes: " + r.getMistakes());
+                System.out.println("Final score: " + r.getFinalScore());
                 if (r.getSolution() != null) {
                     System.out.println("\n── Solution ──");
                     r.getSolution().forEach((theme, words) ->
@@ -243,15 +245,15 @@ public class ClientMain {
             System.out.println("\n── Game #" + r.getGameId()
                     + " Stats [" + r.getGameStatus() + "] ──");
             if ("inProgress".equals(r.getGameStatus())) {
-                System.out.println("Time remaining   : " + r.getRemainingSeconds() + "s");
-                System.out.println("Still playing    : " + r.getPlayersPlaying());
-                System.out.println("Finished         : " + r.getPlayersFinished());
-                System.out.println("Won              : " + r.getPlayersWon());
+                System.out.println("Time remaining: " + r.getRemainingSeconds() + "s");
+                System.out.println("Still playing: " + r.getPlayersPlaying());
+                System.out.println("Finished: " + r.getPlayersFinished());
+                System.out.println("Won: " + r.getPlayersWon());
             } else {
-                System.out.println("Total players    : " + r.getTotalPlayers());
-                System.out.println("Completed        : " + r.getCompleted());
-                System.out.println("Won              : " + r.getWon());
-                System.out.println("Average score    : " + r.getAverageScore());
+                System.out.println("Total players: " + r.getTotalPlayers());
+                System.out.println("Completed: " + r.getCompleted());
+                System.out.println("Won: " + r.getWon());
+                System.out.println("Average score: " + r.getAverageScore());
             }
         }
     }
@@ -269,11 +271,9 @@ public class ClientMain {
             if (r.getLeaderboard() != null) {
                 System.out.println("\n── Leaderboard ──");
                 r.getLeaderboard().forEach(e ->
-                        System.out.printf("#%-3d %-20s %d pts%n",
-                                e.getRank(), e.getUsername(), e.getScore()));
+                        System.out.printf("#%-3d %-20s %d pts%n", e.getRank(), e.getUsername(), e.getScore()));
             } else {
-                System.out.printf("#%d  %s — %d pts%n",
-                        r.getRank(), r.getUsername(), r.getScore());
+                System.out.printf("#%d  %s — %d pts%n", r.getRank(), r.getUsername(), r.getScore());
             }
         }
     }
@@ -308,8 +308,7 @@ public class ClientMain {
         String raw = conn.receive();
         Response resp = ResponseDeserializer.parse(raw);
         if (resp instanceof ErrorResponse e) {
-            System.out.println("SERVER ERROR " + e.getErrorCode()
-                    + ": " + e.getErrorMessage());
+            System.out.println("SERVER ERROR " + e.getErrorCode() + ": " + e.getErrorMessage());
         }
         return resp;
     }

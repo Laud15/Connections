@@ -113,8 +113,7 @@ public class UserStorage {
         return getById(id);
     }
 
-    public User getById(int id){
-        // ✅ FIXED: Use computeIfAbsent for atomic, single-load guarantee
+    public User getById(int id ){
         // If already cached → returns immediately
         // If not cached → loads EXACTLY ONCE, even with 100 concurrent threads
         return cache.computeIfAbsent(id, this::loadFromDiskNoCache);

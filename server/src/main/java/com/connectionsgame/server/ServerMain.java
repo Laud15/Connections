@@ -31,8 +31,8 @@ public class ServerMain {
 
         // ── 2. Storage layer ──────────────────────────────────────────────
         PuzzleStorage puzzleStorage = new PuzzleStorage(config.getPuzzleDataFile());
-        UserStorage   userStorage   = new UserStorage(config.getUserDir());
-        GameStorage   gameStorage   = new GameStorage(config.getGamesDir());
+        UserStorage userStorage = new UserStorage(config.getUserDir());
+        GameStorage gameStorage = new GameStorage(config.getGamesDir());
 
         // ── 3. UDP notifier ───────────────────────────────────────────────
         UdpNotifier udpNotifier = new UdpNotifier(config.getUdpPort());
