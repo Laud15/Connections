@@ -52,7 +52,7 @@ public class GameSession {
     public int getPlayersStillPlaying() {
         return (int) playerStates.values().stream()
             .filter(s->{
-                synchronized(s) { return !s.isFinished(); }
+                return !s.isFinished();
             })
             .count();
     }
@@ -60,7 +60,7 @@ public class GameSession {
     public int getPlayersFinished() {
         return (int) playerStates.values().stream()
             .filter(ps -> {
-                synchronized(ps) { return ps.isFinished(); }
+                return ps.isFinished();
             })
             .count();
     }
@@ -68,19 +68,9 @@ public class GameSession {
     public int getPlayersWon() {
         return (int) playerStates.values().stream()
             .filter(ps -> {
-                synchronized(ps) { return ps.isWon(); }
+                return ps.isWon();
             })
             .count();
-    }
-
-    public double getAverageScore() {
-        if(playerStates.isEmpty()) return 0.0;
-        return playerStates.values().stream()
-                .mapToInt(ps->{
-                    synchronized(ps) { return ps.getCurrentScore(); }
-                })
-                .average()
-                .orElse(0.0);
     }
 
     public int getGameId() { return gameId; }
@@ -96,11 +86,9 @@ public class GameSession {
      */
     public void markAllPlayersTimedOut() {
         playerStates.values().forEach(ps -> {
-            synchronized (ps) {
                 if (!ps.isFinished()) {
                     ps.markTimedOut();
                 }
-            }
         });
     }
 }

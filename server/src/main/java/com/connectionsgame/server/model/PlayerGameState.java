@@ -12,10 +12,9 @@ public class PlayerGameState {
 
     private final List<PuzzleGroup> correctGroups = new ArrayList<>();
 
-    private int mistakes;
+    private int mistakes = 0;
     private boolean finished; //a finished player can still be logged in but cannot send new proposals
     private boolean won; //true if finished and won (found 3 groups in time with < 4 mistakes)
-
     public synchronized int getBonus() { return correctGroups.size() * 6; } //bonus from correct groups: 6/12/18 for 1/2/3 correct groups
     public synchronized int getPenalty() { return mistakes * -4; }//-4 per mistake, maximum -16
     public synchronized int getCurrentScore() { return getBonus() + getPenalty(); }

@@ -22,7 +22,9 @@ ConnectionsGame/
 │   └── gson-2.10.1.jar         # Only external dependency
 ├── server.properties           # Server configuration
 ├── client.properties           # Client configuration
-└── compile.sh                  # Build script (javac)
+├── build.sh / build.bat        # Compile and package (Linux/macOS and Windows)
+├── run-server.sh / run-server.bat
+└── run-client.sh / run-client.bat
 ```
 
 ## Technologies
@@ -49,9 +51,9 @@ ConnectionsGame/
 
 ## Build
 
-### Step by step with javac (required by spec)
+### Step by step with javac 
 
-All commands must be run from the **project root**. The modules must be compiled in order because `server` and `client` both depend on `net`.
+All commands must be run from the **project root**. On Windows use `;` instead of `:` as classpath separator.
 
 ```bash
 # 1. Create output directories
@@ -91,37 +93,41 @@ jar cfm ../client.jar MANIFEST.MF .
 cd ../.. && rm -rf dist/_tmp
 ```
 
-> **Note:** on Windows use `;` instead of `:` as the classpath separator.
+### Using the build scripts (shortcut)
 
-### Using the build script (Linux/macOS shortcut)
+Provided scripts automate the javac steps above:
 
-The `compile.sh` script runs all the steps above automatically:
-
+**Linux / macOS:**
 ```bash
-chmod +x compile.sh
-./compile.sh
+chmod +x build.sh run-server.sh run-client.sh
+./build.sh
 ```
 
-### Using Maven (alternative)
-
-```bash
-mvn package -DskipTests
+**Windows:**
+```bat
+build.bat
 ```
-
-JARs are located at:
-- `server/target/server-1.0-jar-with-dependencies.jar`
-- `client/target/client-1.0-jar-with-dependencies.jar`
 
 ## Running
 
-Both commands must be run from the **project root** (where `server.properties` and `client.properties` are located).
+All commands must be run from the **project root** (where `server.properties` and `client.properties` are located). Build first if `dist/` does not exist yet.
 
+**Linux / macOS:**
 ```bash
-# Start the server first
-java -jar dist/server.jar
+./run-server.sh   # terminal 1
+./run-client.sh   # terminal 2
+```
 
-# In a separate terminal, start the client
-java -jar dist/client.jar
+**Windows:**
+```bat
+run-server.bat    # terminal 1
+run-client.bat    # terminal 2
+```
+
+**Or directly with java:**
+```bash
+java -jar dist/server.jar   # terminal 1
+java -jar dist/client.jar   # terminal 2
 ```
 
 ## Configuration
