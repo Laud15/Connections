@@ -94,7 +94,9 @@ public class UserStorage {
                 if (usernameToId.containsKey(newName)) {return "Username '" + newName + "' is already taken";}
                 usernameToId.remove(oldName);
                 usernameToId.put(newName, user.getUser_id());
-                synchronized (user) { user.setUsername(newName); }
+                synchronized (user) {
+                    user.setUsername(newName);
+                }
                 saveIndex();
             }
             synchronized (user) {

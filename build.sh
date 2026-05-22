@@ -1,58 +1,50 @@
 #!/bin/bash
 # ============================================================
-# build.sh - Compile and package the Connections Game (Linux/macOS)
-# Usage: chmod +x build.sh && ./build.sh
+# build.sh - Build Connections Game (Linux/macOS)
 # ============================================================
+
 set -e
 
 GSON="lib/gson-2.10.1.jar"
 
-# Verify prerequisites
+echo "========================================="
+echo " Building Connections Game"
+echo "========================================="
+
+# Check Java
 if ! command -v javac &> /dev/null; then
-    echo "ERROR: javac not found. Please install Java 21+."
+    echo "ERROR: javac not found. Install Java 21+."
     exit 1
 fi
+
+# Check Gson
 if [ ! -f "$GSON" ]; then
-    echo "ERROR: $GSON not found. Place gson-2.10.1.jar inside lib/"
+    echo "ERROR: $GSON not found."
     exit 1
 fi
 
-mkdir -p build/net build/server build/client dist
+# Clean old build
+rm -rf build dist
 
-# Step 1: compile net (must be first - server and client depend on it)
-echo "[1/4] Compiling net..."
-find net/src/main/java -name "*.java" | xargs javac --release 21 \
-    -cp "$GSON" -d build/net
+mkdir -p build dist
 
-# Step 2: compile server
-echo "[2/4] Compiling server..."
-find server/src/main/java -name "*.java" | xargs javac --release 21 \
-    -cp "$GSON:build/net" -d build/server
+echo "[1/2] Compiling sources..."
 
-# Step 3: compile client
-echo "[3/4] Compiling client..."
-find client/src/main/java -name "*.java" | xargs javac --release 21 \
-    -cp "$GSON:build/net" -d build/client
+# Collect all java files
+find net/src/main/java server/src/main/java client/src/main/java -name "*.java" > sources.txt
 
-# Step 4: package fat JARs
-# A fat JAR bundles all classes + Gson so it runs with just: java -jar
-echo "[4/4] Packaging JARs..."
+# Compile everything together
+javac --release 21 -cp "$GSON" -d build @sources.txt
 
-# -- server.jar --
-mkdir -p dist/_tmp_server && cd dist/_tmp_server
-jar xf "../../$GSON"
-cp -r "../../build/net/." . && cp -r "../../build/server/." .
-printf "Manifest-Version: 1.0\nMain-Class: com.connectionsgame.server.ServerMain\n" > MANIFEST.MF
-jar cfm ../server.jar MANIFEST.MF .
-cd ../.. && rm -rf dist/_tmp_server
+rm sources.txt
 
-# -- client.jar --
-mkdir -p dist/_tmp_client && cd dist/_tmp_client
-jar xf "../../$GSON"
-cp -r "../../build/net/." . && cp -r "../../build/client/." .
-printf "Manifest-Version: 1.0\nMain-Class: com.connectionsgame.client.ClientMain\n" > MANIFEST.MF
-jar cfm ../client.jar MANIFEST.MF .
-cd ../.. && rm -rf dist/_tmp_client
+echo "[2/2] Packaging JARs..."
+
+# Server JAR
+jar cfe dist/server.jar com.connectionsgame.server.ServerMain -C build .
+
+# Client JAR
+jar cfe dist/client.jar com.connectionsgame.client.ClientMain -C build .
 
 echo ""
 echo "Build successful!"

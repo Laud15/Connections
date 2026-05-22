@@ -9,8 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 //there is exactly one GameSession in memory at a time
 // It holds the puzzle data, start/end timestamp, and per-player states
 // concurrency strategy:
-//              - playerStates is ConcurrentHashMap so reads from many threads are safe
-//              - Operations that must be atomic synchronize on the playerGameState object for that specific player, not on this whole GameSession
+//    - playerStates is ConcurrentHashMap so reads from many threads are safe
+//    - Operations that must be atomic synchronize on the playerGameState object for that specific player, not on this whole GameSession
 
 
 public class GameSession {
