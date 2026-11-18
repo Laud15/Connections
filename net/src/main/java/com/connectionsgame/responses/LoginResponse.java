@@ -2,12 +2,10 @@ package com.connectionsgame.responses;
 
 import com.connectionsgame.abstract_class.Response;
 
-import java.util.Currency;
 import java.util.List;
 
 public class LoginResponse extends Response{
 
-    private final String operation = "loginResponse";
     private final String message;
     private final Integer gameId; //null if no acrive game
     private final Long remainingSeconds; //null if no active game

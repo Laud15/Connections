@@ -1,229 +1,111 @@
-# Connections Game
+# Connections — Client–Server Word Game
 
-A server-client implementation of the **Connections** word-grouping game, inspired by the New York Times puzzle. Built as a final project for *Networks and Laboratory — Laboratory Module III*, A.Y. 2025/26.
+University networking project inspired by the Connections word-grouping puzzle.
+Multiple command-line clients share a timed puzzle, with individual progress,
+accounts, scores, statistics and a leaderboard.
 
-## Overview
+Each puzzle contains 16 words in four groups. This implementation awards a win
+after **three correct groups** and a loss after four mistakes. Each correct group
+adds 6 points; each wrong proposal subtracts 4. The server starts the next puzzle
+when the shared timer expires.
 
-Players are presented with 16 words and must group them into 4 thematic categories of 4 words each. The server manages a single global game that all connected players participate in simultaneously. A new game starts automatically when the current one ends.
+## Technologies and design
 
-## Project Structure
+- Java 21 target; Gson for JSON requests, responses and storage. The build
+  scripts use the bundled Gson 2.10.1 JAR; Maven declares Gson 2.11.0.
+- A Java NIO `Selector` handles server TCP connections. A bounded
+  `ThreadPoolExecutor` processes requests and returns responses through a
+  `ConcurrentLinkedQueue`; the selector thread performs socket writes.
+- The client uses a blocking `SocketChannel` with newline-delimited JSON.
+  A separate UDP listener receives game-end notifications.
+- An `AtomicReference` publishes the current game; synchronization on each
+  player's state protects proposal handling. A scheduled executor rotates games.
+- Puzzles are streamed from a 912-entry JSON dataset. User records and completed
+  games are saved as separate JSON files, with a username-to-ID index.
 
-```
-ConnectionsGame/
-├── net/          # Shared module: requests, responses, deserializers
-├── server/       # Game logic, NIO server, persistence
-├── client/       # CLI interface, TCP connection, UDP listener
-├── data/
-│   ├── Connections_Data.json   # Puzzle database (912 puzzles)
-│   └── persistent/             # Runtime data (generated automatically)
-│       ├── users/              # One JSON file per registered user
-│       └── games/              # One JSON file per completed game
-├── lib/
-│   └── gson-2.10.1.jar         # Only external dependency
-├── server.properties           # Server configuration
-├── client.properties           # Client configuration
-├── build.sh / build.bat        # Compile and package (Linux/macOS and Windows)
-├── run-server.sh / run-server.bat
-└── run-client.sh / run-client.bat
-```
+## Prerequisites and build
 
-## Technologies
+Use a complete **JDK 21 or newer**, with `java`, `javac` and `jar` on `PATH`, and
+Bash for the following build command. Run all commands from the repository root.
+The bundled Gson JAR is sufficient for this build; Maven is optional.
 
-- **Java 21**
-- **NIO** — persistent TCP connection on the client side; Selector + ThreadPoolExecutor on the server side
-- **UDP** — asynchronous notifications from server to clients (game over)
-- **Gson 2.10.1** — JSON serialization/deserialization
-- **SHA-256** — password hashing
-
-## Architecture
-
-### Server
-- A single **Selector thread** handles all NIO connections (accept, read, write)
-- A **ThreadPoolExecutor** (`core = CPU cores`, `max = CPU cores × 4`, `CallerRunsPolicy`) processes requests in parallel without ever writing directly to channels — responses are handed back to the Selector thread via a `ConcurrentLinkedQueue` and `selector.wakeup()`
-- A **GameManager** protected by a `ReadWriteLock` coordinates the game lifecycle
-- A **ScheduledExecutorService** fires the game-end timer and triggers the next game
-- Persistence uses one JSON file per user (`{id}_user.json`) and one per completed game (`game_N.json`), so saving one record never requires rewriting others
-
-### Client
-- Blocking-mode `SocketChannel` (NIO) for the TCP connection
-- A daemon **UdpListener** thread for asynchronous server notifications — port is dynamically assigned by the OS (`local.udp.port = 0`) and communicated to the server at login
-- Command-line interface
-
-## Build
-
-### Step by step with javac 
-
-All commands must be run from the **project root**. On Windows use `;` instead of `:` as classpath separator.
-
-```bash
-# 1. Create output directories
-mkdir -p build/net build/server build/client dist
-
-# 2. Compile net module first (server and client depend on it)
-javac --release 21 -cp lib/gson-2.10.1.jar \
-      -d build/net \
-      $(find net/src/main/java -name "*.java")
-
-# 3. Compile server module
-javac --release 21 -cp lib/gson-2.10.1.jar:build/net \
-      -d build/server \
-      $(find server/src/main/java -name "*.java")
-
-# 4. Compile client module
-javac --release 21 -cp lib/gson-2.10.1.jar:build/net \
-      -d build/client \
-      $(find client/src/main/java -name "*.java")
-
-# 5. Package server fat JAR (includes net + Gson)
-cd dist && mkdir -p _tmp && cd _tmp
-jar xf ../../lib/gson-2.10.1.jar
-cp -r ../../build/net/. .
-cp -r ../../build/server/. .
-printf "Manifest-Version: 1.0\nMain-Class: com.connectionsgame.server.ServerMain\n" > MANIFEST.MF
-jar cfm ../server.jar MANIFEST.MF .
-cd ../.. && rm -rf dist/_tmp
-
-# 6. Package client fat JAR (includes net + Gson)
-cd dist && mkdir -p _tmp && cd _tmp
-jar xf ../../lib/gson-2.10.1.jar
-cp -r ../../build/net/. .
-cp -r ../../build/client/. .
-printf "Manifest-Version: 1.0\nMain-Class: com.connectionsgame.client.ClientMain\n" > MANIFEST.MF
-jar cfm ../client.jar MANIFEST.MF .
-cd ../.. && rm -rf dist/_tmp
+```sh
+bash build.sh
 ```
 
-### Using the build scripts (shortcut)
+The script recreates `build/` and `dist/`, producing `dist/server.jar` and
+`dist/client.jar`. Gson must also be present on the runtime classpath.
 
-Provided scripts automate the javac steps above:
+## Minimal example
 
-**Linux / macOS:**
-```bash
-chmod +x build.sh run-server.sh run-client.sh
-./build.sh
+Start the server in one terminal:
+
+```sh
+java -cp "dist/server.jar:lib/gson-2.10.1.jar" com.connectionsgame.server.ServerMain
 ```
 
-**Windows:**
-```bat
-build.bat
+Start the client in another terminal:
+
+```sh
+java -cp "dist/client.jar:lib/gson-2.10.1.jar" com.connectionsgame.client.ClientMain
 ```
 
-## Running
+The existing `.sh` launchers are swapped: `run-server.sh` starts the client and
+`run-client.sh` starts the server. Use the explicit commands above. On Windows,
+the classpath separator is `;` instead of `:`.
 
-All commands must be run from the **project root** (where `server.properties` and `client.properties` are located). Build first if `dist/` does not exist yet.
+For a fresh data directory, the first puzzle accepts the proposal below. Later
+games use different words; use the words displayed by the client.
 
-**Linux / macOS:**
-```bash
-./run-server.sh   # terminal 1
-./run-client.sh   # terminal 2
+```text
+register readme_demo demo-password
+login readme_demo demo-password
+gameinfo
+propose SNOW HAIL RAIN SLEET
+logout
+quit
 ```
 
-**Windows:**
-```bat
-run-server.bat    # terminal 1
-run-client.bat    # terminal 2
-```
+Use underscores for spaces within a proposed phrase. `help` lists the remaining
+commands, including `mystats`, `gamestats`, `leaderboard` and `updatecredentials`.
+Stop the server with Ctrl+C.
 
-**Or directly with java:**
-```bash
-java -jar dist/server.jar   # terminal 1
-java -jar dist/client.jar   # terminal 2
-```
+## Configuration and files
 
-## Configuration
+The supplied settings use TCP port **12345**, server UDP port **12346**,
+three-minute games and a 30-second user-data flush interval. The client connects
+to `localhost` and requests an OS-assigned UDP port. Paths are relative to the
+repository root; persistence directories are created automatically.
 
-### `server.properties`
+| Path | Purpose |
+| --- | --- |
+| `net/` | Shared request/response classes and JSON deserializers |
+| `server/` | NIO server, game logic and storage |
+| `client/` | Command-line interface, TCP connection and UDP listener |
+| `data/Connections_Data.json` | Puzzle dataset |
+| `data/persistent/` | Generated user records, index and completed-game results |
+| `server.properties`, `client.properties` | Network, timing and storage settings |
+| `lib/`, `build.sh`, `pom.xml` | Bundled dependency and build entry points |
 
-| Parameter | Description | Default |
-|---|---|---|
-| `tcp.port` | TCP port the server listens on | `12345` |
-| `udp.port` | UDP port for async notifications | `12346` |
-| `game.duration.minutes` | Duration of each game | `5` |
-| `thread.pool.core` | Core thread pool size | `CPU cores` |
-| `thread.pool.max` | Maximum thread pool size | `CPU cores × 4` |
-| `thread.keepalive.seconds` | Idle thread keep-alive time | `60` |
-| `thread.queue.capacity` | Work queue capacity before backpressure | `200` |
-| `puzzle.data.file` | Path to the puzzle data file | `./data/Connections_Data.json` |
-| `users.dir` | Directory for user files | `./data/persistent/users` |
-| `games.dir` | Directory for game result files | `./data/persistent/games` |
-| `persistence.interval.seconds` | Periodic disk flush interval | `30` |
+## Verification
 
-### `client.properties`
+The two explicit launch commands and a short local CLI session were verified in
+a temporary copy on Linux with OpenJDK 25: registration, login, a correct
+proposal, game information, personal statistics, leaderboard, logout and quit.
 
-| Parameter | Description | Default |
-|---|---|---|
-| `server.host` | Server address | `localhost` |
-| `server.tcp.port` | Server TCP port | `12345` |
-| `local.udp.port` | Local UDP port (`0` = OS-assigned) | `0` |
-| `read.timeout.ms` | TCP read timeout in milliseconds | `10000` |
+Sources were compiled using the installed compiler module with
+`-source 21 -target 21` against Java 25 APIs. **`bash build.sh` remains unverified
+with a complete JDK:** its `--release 21` step was attempted but unsupported by
+the available runtime image. Java 21 runtime compatibility, Maven/Windows builds,
+timer expiry, UDP delivery and concurrent load remain unverified.
 
-## Client Commands
+## Limitations
 
-| Command | Description |
-|---|---|
-| `register <username> <password>` | Create a new account |
-| `login <username> <password>` | Log in and display current game state |
-| `logout` | Log out |
-| `propose <w1> <w2> <w3> <w4>` | Submit a group proposal (4 individual words) |
-| `gameinfo [gameId]` | State of the current game or a historical one |
-| `gamestats [gameId]` | Aggregate statistics for a game |
-| `leaderboard [top=K\|player=name]` | Full ranking, top-K, or single player position |
-| `mystats` | Personal statistics |
-| `help` | Show all available commands |
-| `quit` | Exit the client |
-
-### Example Session
-
-```
-> register alice password123
-✓ Registration successful
-
-> login alice password123
-✓ Login successful
-
-── Game #1 [inProgress] ──
-Time remaining : 280s
-Words to group :
-SNOW    HAIL    BUCKS   JAZZ
-SHIFT   TAB     RAIN    NETS
-KAYAK   LEVEL   SLEET   MOM
-RETURN  OPTION  RACECAR FOOT
-
-> propose SNOW HAIL RAIN SLEET
-✓ Correct! Theme: WET WEATHER
-  Current score: 6
-
-> mystats
-
-── Your Statistics ──
-Puzzles Completed : 3
-Win Rate          : 66.7%
-Loss Rate         : 0.0%
-Current Streak    : 2
-Max Streak        : 2
-Perfect Puzzles   : 1
-Mistake Histogram :
-  0 mistakes: ## (2)
-  1 mistakes: # (1)
-  2 mistakes:  (0)
-  3 mistakes:  (0)
-  4 mistakes:  (0)
-```
-
-## Scoring
-
-| Event | Points |
-|---|---|
-| 1 correct group | +6 |
-| 2 correct groups | +12 |
-| 3 correct groups (win) | +18 |
-| Each wrong proposal | −4 |
-
-## Persistence
-
-The server saves data incrementally at multiple points:
-- **On register** — user file created immediately
-- **On game end** — each player's stats updated and flushed to their file; game result written to `game_N.json`
-- **Periodic flush** — every 30 seconds (configurable), all cached users are written to disk as a safety net against sudden crashes
-
-User files are named `{id}_user.json` where the numeric ID is stable across username changes. A small `index.json` maps usernames to IDs and is used for login lookups.
+- Passwords are transmitted over unencrypted TCP and stored in plain text.
+  Password hashing and TLS are not implemented.
+- `read.timeout.ms` is currently unused. When the worker pool and queue are full,
+  rejected requests are logged without a response, so a client can remain blocked.
+- Network buffers have fixed capacities; oversized messages and pending writes
+  are not handled robustly.
+- Active-game progress is held in memory and is lost on restart. JSON writes
+  are not transactional.

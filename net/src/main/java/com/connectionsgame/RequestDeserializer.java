@@ -2,7 +2,6 @@ package com.connectionsgame;
 
 import com.connectionsgame.abstract_class.Request;
 import com.connectionsgame.requests.*;
-import com.connectionsgame.responses.ErrorResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;

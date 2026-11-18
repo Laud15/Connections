@@ -1,7 +1,6 @@
 package com.connectionsgame.abstract_class;
 
 import java.util.Objects;
-import com.google.gson.annotations.SerializedName;
 
 public abstract class Request {
 

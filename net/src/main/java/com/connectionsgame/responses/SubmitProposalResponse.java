@@ -5,7 +5,6 @@ import java.util.List;
 
 public class SubmitProposalResponse extends Response {
 
-    private final String operation = "submitProposal";
     private final boolean correct;
     private final String theme; //null when wrong
     private final List<String> words; //null when wrong

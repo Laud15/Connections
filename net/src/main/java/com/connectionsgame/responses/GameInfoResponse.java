@@ -6,7 +6,6 @@ import java.util.Map;
 
 public class GameInfoResponse extends Response {
 
-    private final String operation = "responseGameInfo";
     private final int gameId;
     private final String gameStatus;
 

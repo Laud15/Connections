@@ -4,7 +4,6 @@ import com.connectionsgame.abstract_class.Response;
 
 public class GameStatsResponse extends Response {
 
-    private final String operation = "responseGameStats";
     private final int gameId;
     private final String gameStatus;
 

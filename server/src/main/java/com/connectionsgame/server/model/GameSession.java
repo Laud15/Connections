@@ -2,7 +2,6 @@ package com.connectionsgame.server.model;
 
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 //represents the single active game

@@ -37,8 +37,6 @@ public class LeaderBoardResponse extends Response {
     }
 
 
-    private final String operation = "responseLeaderboard";
-
     //Full / top-K list
     private final List<LeaderboardEntry> leadBoard;
 

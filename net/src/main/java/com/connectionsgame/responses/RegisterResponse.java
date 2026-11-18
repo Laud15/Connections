@@ -4,7 +4,6 @@ import com.connectionsgame.abstract_class.Response;
 
 public class RegisterResponse extends Response {
 
-    private final String operation = "registerResponse";
     private final String message;
 
     public RegisterResponse(String message) {

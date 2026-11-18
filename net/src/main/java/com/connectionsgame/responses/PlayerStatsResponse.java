@@ -1,11 +1,9 @@
 package com.connectionsgame.responses;
 
 import com.connectionsgame.abstract_class.Response;
-import com.connectionsgame.requests.PlayerStatsRequest;
 
 public class PlayerStatsResponse extends Response {
 
-    private final String operation = "responsePlayerStats";
     private final int puzzlesCompleted;
     private final double winRate;
     private final double lossRate;
